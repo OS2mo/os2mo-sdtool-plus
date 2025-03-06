@@ -13,11 +13,13 @@ from more_itertools import last
 from more_itertools import only
 from more_itertools import split_when
 from pydantic import BaseModel
+from pydantic import PositiveInt
 from pydantic import root_validator
 from pydantic import validator
 from pydantic.generics import GenericModel
 
 from sdtoolplus.exceptions import NoValueError
+from sdtoolplus.mo_org_unit_importer import OrgUnitUUID
 
 DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%f (%Z)"
 V = TypeVar("V")
@@ -81,6 +83,26 @@ class UnitLevel(Interval[str]):
 
 
 class UnitName(Interval[str]):
+    pass
+
+
+class EngagementKey(Interval[PositiveInt]):
+    """
+    The SD JobPositionIdentifier corresponding to MOs job_function user_key
+    """
+
+    pass
+
+
+class EngagementName(Interval[str]):
+    """
+    The SD (free text) EmploymentName corresponding to MOs extension_1 on the engagement
+    """
+
+    pass
+
+
+class EngagementUnit(Interval[OrgUnitUUID]):
     pass
 
 
@@ -158,6 +180,7 @@ class Timeline(GenericModel, Generic[T]):
         frozen = True
 
 
+# TODO: Maybe use GenericModel to fix mypy issues
 class UnitTimeline(BaseModel):
     active: Timeline[Active]
     name: Timeline[UnitName]
@@ -187,5 +210,40 @@ class UnitTimeline(BaseModel):
                 == other.unit_id.entity_at(timestamp)
                 and self.unit_level.entity_at(timestamp)
                 == other.unit_level.entity_at(timestamp)
+            )
+        return False
+
+
+class EngagementTimeline(BaseModel):
+    eng_active: Timeline[Active]
+    eng_key: Timeline[EngagementKey]
+    eng_name: Timeline[EngagementName]
+    eng_unit: Timeline[EngagementUnit]
+
+    def has_value(self, timestamp: datetime) -> bool:
+        # TODO: unit test
+        try:
+            self.eng_active.entity_at(timestamp)
+            self.eng_key.entity_at(timestamp)
+            self.eng_name.entity_at(timestamp)
+            self.eng_unit.entity_at(timestamp)
+            return True
+        except NoValueError:
+            return False
+
+    def equal_at(self, timestamp: datetime, other: "EngagementTimeline") -> bool:
+        # TODO: unit test
+        if self.has_value(timestamp) == other.has_value(timestamp):
+            if self.has_value(timestamp) is False:
+                return True
+            return (
+                self.eng_active.entity_at(timestamp)
+                == other.eng_active.entity_at(timestamp)
+                and self.eng_key.entity_at(timestamp)
+                == other.eng_key.entity_at(timestamp)
+                and self.eng_name.entity_at(timestamp)
+                == other.eng_name.entity_at(timestamp)
+                and self.eng_unit.entity_at(timestamp)
+                == other.eng_unit.entity_at(timestamp)
             )
         return False
