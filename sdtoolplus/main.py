@@ -325,6 +325,51 @@ def create_fastramqpi(**kwargs: Any) -> FastRAMQPI:
 
         return {"msg": "success"}
 
+    @fastapi_router.post("/timeline/sync/engagement", status_code=HTTP_200_OK)
+    async def timeline_sync_engagement(
+        gql_client: GraphQLClient,
+        inst_id: str,
+        dry_run: bool = False,
+    ) -> dict:
+        """
+        Sync the entire engagement timeline for the given CPR and
+        SD EmploymentIdentifier (corresponding to the MO engagement user_key).
+
+        Args:
+            gql_client: The GraphQL client
+
+            inst_id: The SD institution
+            dry_run: If true, nothing will be written to MO.
+
+        Returns:
+            Dictionary with status
+        """
+
+        logger.info(
+            "Sync OU timeline", inst_id=inst_id, org_uuid=str(org_unit), dry_run=dry_run
+        )
+
+        sd_client = SDClient(
+            settings.sd_username,
+            settings.sd_password.get_secret_value(),
+        )
+        sd_unit_timeline = get_department_timeline(
+            sd_client=sd_client, inst_id=inst_id, unit_uuid=org_unit
+        )
+
+        mo_unit_timeline = await get_ou_timeline(gql_client, org_unit)
+
+        await sync_ou(
+            gql_client=gql_client,
+            org_unit=org_unit,
+            sd_unit_timeline=sd_unit_timeline,
+            mo_unit_timeline=mo_unit_timeline,
+            org_unit_type_user_key=settings.org_unit_type,
+            dry_run=dry_run,
+        )
+
+        return {"msg": "success"}
+
     app = fastramqpi.get_app()
     app.include_router(fastapi_router)
 

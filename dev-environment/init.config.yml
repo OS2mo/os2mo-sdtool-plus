@@ -49,3 +49,12 @@ facets:
     Ninja:
       title: "Ninja"
       scope: "TEXT"
+    1234:
+      title: "Kung Fu Master"
+      scope: "TEXT"
+    5678:
+      title: "Shogun"
+      scope: "TEXT"
+    9000:
+      title: "Karate Coach"
+      scope: "TEXT"

@@ -161,8 +161,6 @@ async def test_ou_timeline_name_and_id_and_level_http_triggered_sync(
     MO (id)                 |--------------ABCD--------------|----------IJKL---------
     MO (level)              |---NY0----|-------------------NY1-----------------------
 
-    TODO: add extension_7
-
     "Arrange" intervals     |-----1----|---2---|------3------|----------4------------
 
     SD (name)     |-------name1--------|----name2-----|-------name3--------|
@@ -188,7 +186,7 @@ async def test_ou_timeline_name_and_id_and_level_http_triggered_sync(
 
     unit_uuid = UUID("11111111-1111-1111-1111-111111111111")
 
-    # Create unit (arrange interval 1-4)
+    # Create unit (arrange intervals 1-4)
     await graphql_client._testing__create_org_unit(
         uuid=unit_uuid,
         name="name4",
