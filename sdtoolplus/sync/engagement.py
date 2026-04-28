@@ -33,6 +33,7 @@ from sdtoolplus.mo.timelines.engagement import terminate_engagement
 from sdtoolplus.mo.timelines.engagement import update_engagement
 from sdtoolplus.mo.timelines.leave import get_leave_timeline as get_mo_leave_timeline
 from sdtoolplus.mo.timelines.leave import terminate_leave_before_engagement_termination
+from sdtoolplus.mo.timelines.org_unit import get_ou_timeline
 from sdtoolplus.mo.timelines.related_unit import related_units
 from sdtoolplus.mo_org_unit_importer import OrgUnitUUID
 from sdtoolplus.models import EngagementKey
@@ -467,6 +468,76 @@ async def fix_missing_job_functions(
     return desired_eng_timeline
 
 
+async def fix_too_narrow_ou_validities(
+    gql_client: GraphQLClient,
+    desired_eng_timeline: EngagementTimeline,
+    unknown_unit: OrgUnitUUID,
+) -> EngagementTimeline:
+    """
+    Due to bad data in SD (which cannot be fixed in the source system), where the OUs of
+    the engagement do not actually exist in the entire engagement interval specified in
+    SD, we need to replace the engagement with the unknown unit in the problematic
+    intervals.
+
+    This function patched the engagement unit timeline with "Unknown" in the affected
+    intervals.
+
+    Args:
+        gql_client: the GraphQLClient
+        desired_eng_timeline: the desired engagement timeline
+        unknown_unit: UUID of the unknown unit
+    """
+    logger.info("Fix too narrow OU validities")
+
+    # Get a set of all the OU UUIDs so we only fetch each unit timeline once from MO
+    ou_uuids = set(
+        cast(OrgUnitUUID, interval.value)
+        for interval in desired_eng_timeline.eng_unit.intervals
+    )
+
+    mo_ou_timelines = {
+        ou_uuid: await get_ou_timeline(gql_client, ou_uuid) for ou_uuid in ou_uuids
+    }
+
+    # Patch with the unknown unit in the problematic intervals
+    intervals = []
+    for interval in desired_eng_timeline.eng_unit.intervals:
+        ou_uuid = cast(OrgUnitUUID, interval.value)
+        ou_active_endpoints = mo_ou_timelines[ou_uuid].active.get_interval_endpoints()
+        endpoints = sorted(
+            {interval.start, interval.end}.union(
+                endpoint
+                for endpoint in ou_active_endpoints
+                if interval.start <= endpoint <= interval.end
+            )
+        )
+        for start, end in pairwise(endpoints):
+            ou = cast(OrgUnitUUID, desired_eng_timeline.eng_unit.entity_at(start).value)
+            try:
+                mo_ou_timelines[ou_uuid].active.entity_at(start)
+            except NoValueError:
+                ou = unknown_unit
+            intervals.append(EngagementUnit(start=start, end=end, value=ou))
+
+    eng_unit_timeline = Timeline[EngagementUnit](
+        intervals=combine_intervals(tuple(intervals))
+    )
+
+    logger.info("Engagement OU timeline", eng_unit_timeline=eng_unit_timeline.dict())
+
+    desired_timeline = EngagementTimeline(
+        eng_active=desired_eng_timeline.eng_active,
+        eng_key=desired_eng_timeline.eng_key,
+        eng_name=desired_eng_timeline.eng_name,
+        eng_unit=eng_unit_timeline,
+        eng_sd_unit=desired_eng_timeline.eng_sd_unit,
+        eng_unit_id=desired_eng_timeline.eng_unit_id,
+        eng_type=desired_eng_timeline.eng_type,
+    )
+
+    return desired_timeline
+
+
 @handle_exclusively_decorator(
     key=lambda sd_client,
     gql_client,
@@ -618,6 +689,13 @@ async def sync_engagement(
     desired_eng_timeline = await fix_missing_job_functions(
         gql_client=gql_client,
         sd_eng_timeline=desired_eng_timeline,
+    )
+
+    assert settings.unknown_unit is not None
+    desired_eng_timeline = await fix_too_narrow_ou_validities(
+        gql_client=gql_client,
+        desired_eng_timeline=desired_eng_timeline,
+        unknown_unit=settings.unknown_unit,
     )
 
     mo_leave_timeline = await get_mo_leave_timeline(
