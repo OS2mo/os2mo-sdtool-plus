@@ -2735,6 +2735,7 @@ async def test_get_engagement_timeline_unit_id_null_in_timeline_interval(
 
 
 @pytest.mark.integration_test
+@pytest.mark.envvar({"UNKNOWN_UNIT": str(UNKNOWN_UNIT)})
 async def test_eng_timeline_delete_engagement_and_leave_not_found_in_sd(
     test_client: AsyncClient,
     graphql_client: GraphQLClient,
