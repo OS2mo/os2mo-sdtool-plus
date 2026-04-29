@@ -49,6 +49,7 @@ async def test_person_address_sync_flags(
         gql_client=mock_gql_client,
         settings=SDToolPlusSettings.parse_obj(settings),
         person_uuid=uuid4(),
+        institution_identifier="II",
         sd_person=sd_person,
     )
 
@@ -87,6 +88,7 @@ async def test_engagement_disable_engagement_phone_number_sync_flag(
     await _sync_addresses(
         gql_client=mock_gql_client,
         settings=SDToolPlusSettings.parse_obj(settings),
+        institution_identifier="II",
         person_uuid=uuid4(),
         sd_person=sd_person,
     )
@@ -122,6 +124,7 @@ async def test_engagement_disable_engagement_email_address_sync_flag(
     await _sync_addresses(
         gql_client=mock_gql_client,
         settings=SDToolPlusSettings.parse_obj(settings),
+        institution_identifier="II",
         person_uuid=uuid4(),
         sd_person=sd_person,
     )
