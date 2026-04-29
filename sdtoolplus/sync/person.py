@@ -135,6 +135,7 @@ async def terminate_leftover_addresses(
     person_uuid: UUID,
     address_type_uuid: UUID,
     address_uuids_processed: set[UUID],
+    multiple_institutions: bool,
 ) -> None:
     # Terminate any leftover engagement addresses
     now = datetime.now(tz=TIMEZONE)
@@ -147,26 +148,26 @@ async def terminate_leftover_addresses(
         )
     )
 
-    # TODO: only call this in cases where multiple institutions are in use
     # Only terminate addresses which belong to the relevant institution
-    mo_address_uuids = set()
-    for mo_address in mo_addresses.objects:
-        addr_eng_uuid = one(
-            set(validity.engagement_uuid for validity in mo_address.validities)
-        )
-        mo_engagement = await gql_client.get_engagement_timeline(
-            EngagementFilter(uuids=[addr_eng_uuid])
-        )
-        objects_ = only(mo_engagement.objects)
-        if objects_ is None:
-            mo_address_uuids.add(mo_address.uuid)
-            continue
-        user_key = first(objects_.validities).user_key
-        eng_inst_id, _ = user_key.split("-")
-        if eng_inst_id == institution_identifier:
-            mo_address_uuids.add(mo_address.uuid)
+    mo_address_uuids = set(email.uuid for email in mo_addresses.objects)
+    if multiple_institutions:
+        mo_address_uuids = set()
+        for mo_address in mo_addresses.objects:
+            addr_eng_uuid = one(
+                set(validity.engagement_uuid for validity in mo_address.validities)
+            )
+            mo_engagement = await gql_client.get_engagement_timeline(
+                EngagementFilter(uuids=[addr_eng_uuid])
+            )
+            objects_ = only(mo_engagement.objects)
+            if objects_ is None:
+                mo_address_uuids.add(mo_address.uuid)
+                continue
+            user_key = first(objects_.validities).user_key
+            eng_inst_id, _ = user_key.split("-")
+            if eng_inst_id == institution_identifier:
+                mo_address_uuids.add(mo_address.uuid)
 
-    # mo_address_uuids = set(email.uuid for email in mo_addresses.objects)
     leftover_addresses = mo_address_uuids.difference(address_uuids_processed)
     for address_uuid in leftover_addresses:
         logger.info("Terminate leftover address", uuid=str(address_uuid))
@@ -246,12 +247,18 @@ async def _sync_engagement_phone_numbers(
         if phone2_uuid is not None:
             phone2_uuids_processed.add(phone2_uuid)
 
+    multiple_institutions = (
+        len(settings.mo_subtree_paths_for_root) > 1
+        if settings.mo_subtree_paths_for_root is not None
+        else False
+    )
     await terminate_leftover_addresses(
         gql_client=gql_client,
         person_uuid=person_uuid,
         institution_identifier=institution_identifier,
         address_type_uuid=eng_phone1_type_uuid,
         address_uuids_processed=phone1_uuids_processed,
+        multiple_institutions=multiple_institutions,
     )
 
     await terminate_leftover_addresses(
@@ -260,6 +267,7 @@ async def _sync_engagement_phone_numbers(
         institution_identifier=institution_identifier,
         address_type_uuid=eng_phone2_type_uuid,
         address_uuids_processed=phone2_uuids_processed,
+        multiple_institutions=multiple_institutions,
     )
 
     logger.info("Done syncing engagement phone numbers")
@@ -327,6 +335,9 @@ async def _sync_engagement_emails(
         institution_identifier=institution_identifier,
         address_type_uuid=eng_email_type_uuid,
         address_uuids_processed=address_uuids_processed,
+        multiple_institutions=len(settings.mo_subtree_paths_for_root) > 1
+        if settings.mo_subtree_paths_for_root is not None
+        else False,
     )
 
     logger.info("Done syncing engagement emails")
