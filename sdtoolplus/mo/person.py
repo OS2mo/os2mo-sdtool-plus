@@ -97,7 +97,7 @@ async def update_address(
     visibility_uuid: UUID,
     address_type_uuid: UUID,
     engagement_uuid: UUID | None = None,
-) -> None:
+) -> UUID:
     logger.info("Update address", value=value, from_=from_, address_uuid=address_uuid)
 
     address_update_input = AddressUpdateInput(
@@ -113,6 +113,7 @@ async def update_address(
 
     await gql_client.update_address(address_update_input)
     logger.info("Address updated", address_uuid=str(address_uuid))
+    return address_uuid
 
 
 async def terminate_address(
