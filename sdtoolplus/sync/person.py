@@ -131,6 +131,7 @@ async def _sync_address(
 
 async def terminate_leftover_addresses(
     gql_client: GraphQLClient,
+    institution_identifier: str,
     person_uuid: UUID,
     address_type_uuid: UUID,
     address_uuids_processed: set[UUID],
@@ -155,6 +156,7 @@ async def terminate_leftover_addresses(
 async def _sync_engagement_phone_numbers(
     gql_client: GraphQLClient,
     settings: SDToolPlusSettings,
+    institution_identifier: str,
     person_uuid: UUID,
     engagement_phone_numbers: list[EngagementPhoneNumbers],
     visibility_uuid: UUID,
@@ -227,6 +229,7 @@ async def _sync_engagement_phone_numbers(
     await terminate_leftover_addresses(
         gql_client=gql_client,
         person_uuid=person_uuid,
+        institution_identifier=institution_identifier,
         address_type_uuid=eng_phone1_type_uuid,
         address_uuids_processed=phone1_uuids_processed,
     )
@@ -234,6 +237,7 @@ async def _sync_engagement_phone_numbers(
     await terminate_leftover_addresses(
         gql_client=gql_client,
         person_uuid=person_uuid,
+        institution_identifier=institution_identifier,
         address_type_uuid=eng_phone2_type_uuid,
         address_uuids_processed=phone2_uuids_processed,
     )
@@ -245,6 +249,7 @@ async def _sync_engagement_emails(
     gql_client: GraphQLClient,
     settings: SDToolPlusSettings,
     person_uuid: UUID,
+    institution_identifier: str,
     engagement_emails: list[EngagementEmails],
     visibility_uuid: UUID,
 ) -> None:
@@ -299,6 +304,7 @@ async def _sync_engagement_emails(
     await terminate_leftover_addresses(
         gql_client=gql_client,
         person_uuid=person_uuid,
+        institution_identifier=institution_identifier,
         address_type_uuid=eng_email_type_uuid,
         address_uuids_processed=address_uuids_processed,
     )
@@ -309,6 +315,7 @@ async def _sync_engagement_emails(
 async def _sync_addresses(
     gql_client: GraphQLClient,
     settings: SDToolPlusSettings,
+    institution_identifier: str,
     person_uuid: UUID,
     sd_person: Person,
 ) -> None:
@@ -389,6 +396,7 @@ async def _sync_addresses(
             gql_client=gql_client,
             settings=settings,
             person_uuid=person_uuid,
+            institution_identifier=institution_identifier,
             engagement_phone_numbers=sd_person.engagement_phone_numbers,
             visibility_uuid=visibility_uuid,
         )
@@ -399,6 +407,7 @@ async def _sync_addresses(
             gql_client=gql_client,
             settings=settings,
             person_uuid=person_uuid,
+            institution_identifier=institution_identifier,
             engagement_emails=sd_person.engagement_emails,
             visibility_uuid=visibility_uuid,
         )
@@ -513,6 +522,7 @@ async def sync_person(
         await _sync_addresses(
             gql_client=gql_client,
             settings=settings,
+            institution_identifier=institution_identifier,
             person_uuid=person_uuid,
             sd_person=sd_person,
         )
