@@ -149,7 +149,11 @@ async def terminate_leftover_addresses(
     )
 
     # Only terminate addresses which belong to the relevant institution
+    # TODO: change name of loop variable
     mo_address_uuids = set(email.uuid for email in mo_addresses.objects)
+
+    # Refactor this block according to the comments here:
+    # https://git.magenta.dk/rammearkitektur/os2mo-sdtool-plus/-/merge_requests/320
     if multiple_institutions:
         mo_address_uuids = set()
         for mo_address in mo_addresses.objects:
