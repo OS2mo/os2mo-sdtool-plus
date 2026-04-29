@@ -146,7 +146,27 @@ async def terminate_leftover_addresses(
             to_date=None,
         )
     )
-    mo_address_uuids = set(email.uuid for email in mo_addresses.objects)
+
+    # TODO: only call this in cases where multiple institutions are in use
+    # Only terminate addresses which belong to the relevant institution
+    mo_address_uuids = set()
+    for mo_address in mo_addresses.objects:
+        addr_eng_uuid = one(
+            set(validity.engagement_uuid for validity in mo_address.validities)
+        )
+        mo_engagement = await gql_client.get_engagement_timeline(
+            EngagementFilter(uuids=[addr_eng_uuid])
+        )
+        objects_ = only(mo_engagement.objects)
+        if objects_ is None:
+            mo_address_uuids.add(mo_address.uuid)
+            continue
+        user_key = first(objects_.validities).user_key
+        eng_inst_id, _ = user_key.split("-")
+        if eng_inst_id == institution_identifier:
+            mo_address_uuids.add(mo_address.uuid)
+
+    # mo_address_uuids = set(email.uuid for email in mo_addresses.objects)
     leftover_addresses = mo_address_uuids.difference(address_uuids_processed)
     for address_uuid in leftover_addresses:
         logger.info("Terminate leftover address", uuid=str(address_uuid))
