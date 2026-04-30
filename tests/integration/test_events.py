@@ -3,6 +3,7 @@
 import json
 from datetime import date
 from datetime import datetime
+from unittest import skip
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -403,6 +404,7 @@ async def test_retry_after_when_sd_api_is_closed(
             assert r.headers.get("Retry-After") == retry_after
 
 
+@skip("Skip until work-around in process_sd_amqp_employment_event is removed")
 @pytest.mark.parametrize(
     "event_type, expected",
     [

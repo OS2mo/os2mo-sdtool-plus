@@ -155,6 +155,21 @@ async def process_sd_amqp_employment_event(
         )
         return
 
+    # TODO: temporary work-around until we either:
+    #       1) Make one common handler for all event where each event triggers a
+    #          sequential sync in the order person, engagement and addresses
+    #       2) Separate the person and address sync
+    await graphql_client.send_event(
+        input=EventSendInput(
+            namespace="sd",
+            routing_key="person",
+            subject=PersonGraphQLEvent(
+                institution_identifier=event.instCode,
+                cpr=event.cpr,
+            ).json(),
+        )
+    )
+
     await graphql_client.send_event(
         input=EventSendInput(
             namespace="sd",
