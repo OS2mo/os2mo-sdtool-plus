@@ -1328,6 +1328,8 @@ async def test_person_addresses_terminate(
     Email (12345) (remove) |-----------------norris@hollywood.com--------------------
     Email (12345) (remove) |-----------------norris@hollywood.com--------------------
     Email (12345) (remove) |-----------------chuck@hollywood.com--------------------
+    # The one below without an engagement UUID reference
+    Email (remove)         |-------------------chuck@kung.fu-------------------------
     Email (23456) (remove) |--------------------bruce@kung.fu------------------------
     Email (34567) (remove) |-------------------brandon@kung.fu-----------------------
 
@@ -1569,6 +1571,18 @@ async def test_person_addresses_terminate(
         )
     )
 
+    # Create engagement email without an engagement UUID reference
+    await graphql_client.create_address(
+        AddressCreateInput(
+            person=person_uuid,
+            user_key="chuck@kung.fu",
+            value="chuck@kung.fu",
+            address_type=eng_email_address_type_uuid,
+            visibility=visibility_uuid,
+            validity=timeline_interval_to_mo_validity(t1, POSITIVE_INFINITY),
+        )
+    )
+
     # Create engagement email (which is not found in SD) for EmploymentIdentifier 23456
     await graphql_client.create_address(
         AddressCreateInput(
@@ -1741,6 +1755,20 @@ async def test_person_addresses_terminate(
     assert interval_1.value == "norris@hollywood.com"
     assert interval_1.visibility_uuid == visibility_uuid
     assert interval_1.address_type.uuid == eng_email_address_type_uuid
+
+    # Engagement email (no engagement reference)
+    # We can only test this by counting to see that the correct number of engagement
+    # emails are present (since we cannot set any engagement filter in this query)
+    r_engagement_email = await graphql_client.get_address_timeline(
+        input=AddressFilter(
+            employee=EmployeeFilter(uuids=[person_uuid]),
+            address_type=ClassFilter(uuids=[eng_email_address_type_uuid]),
+            from_date=now,
+            to_date=None,
+        )
+    )
+
+    assert len(r_engagement_email.objects) == 1
 
     # Engagement email (23456)
     r_engagement_email = await graphql_client.get_address_timeline(
