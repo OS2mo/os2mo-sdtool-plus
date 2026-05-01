@@ -496,13 +496,20 @@ async def fix_too_narrow_ou_validities(
     )
 
     mo_ou_timelines = {
-        ou_uuid: await get_ou_timeline(gql_client, ou_uuid) for ou_uuid in ou_uuids
+        ou_uuid: await get_ou_timeline(gql_client, ou_uuid)
+        for ou_uuid in ou_uuids
+        if not ou_uuid == unknown_unit
     }
 
     # Patch with the unknown unit in the problematic intervals
     intervals = []
     for interval in desired_eng_timeline.eng_unit.intervals:
         ou_uuid = cast(OrgUnitUUID, interval.value)
+
+        if ou_uuid == unknown_unit:
+            intervals.append(interval)
+            continue
+
         ou_active_endpoints = mo_ou_timelines[ou_uuid].active.get_interval_endpoints()
         endpoints = sorted(
             {interval.start, interval.end}.union(
