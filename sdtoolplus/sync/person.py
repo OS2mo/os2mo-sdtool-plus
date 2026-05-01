@@ -160,6 +160,13 @@ async def terminate_leftover_addresses(
             addr_eng_uuid = one(
                 set(validity.engagement_uuid for validity in mo_address.validities)
             )
+
+            if addr_eng_uuid is None:
+                # This happens for leftover buggy engagement addresses without an
+                # engagement UUID reference
+                await terminate_address(gql_client, mo_address.uuid, now)
+                continue
+
             mo_engagement = await gql_client.get_engagement_timeline(
                 EngagementFilter(uuids=[addr_eng_uuid])
             )
