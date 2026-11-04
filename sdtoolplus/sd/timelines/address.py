@@ -4,7 +4,7 @@ from typing import cast
 from uuid import UUID
 
 import structlog
-from async_lru import alru_cache
+from aiohttp import ClientError
 from fastramqpi.os2mo_dar_client import AsyncDARClient
 
 from sdtoolplus.config import SDToolPlusSettings
@@ -15,21 +15,22 @@ from sdtoolplus.models import combine_intervals
 logger = structlog.stdlib.get_logger()
 
 
-@alru_cache()
 async def _get_dar_address(dar_client: AsyncDARClient, address: str) -> UUID | None:
     try:
-        r = await dar_client.cleanse_single(address)
-        value = r["id"]
-        logger.info("Found address in DAR", dar_uuid_address=value)
-        return value
-    except ValueError:
+        dar_uuid_address = await dar_client.search(address)
+    except (ClientError, TimeoutError, ValueError, KeyError):
+        # This will happen when DAR is occasionally down or returns an
+        # unexpected response. In this case, the OU event fails and will be
+        # retried later.
+        logger.error("Failed to get DAR address", addr=address)
+        raise
+
+    if dar_uuid_address is None:
         logger.warning("No DAR address match", addr=address)
         return None
-    except Exception as error:
-        # This will happen when DAR is occasionally down. In this case,
-        # the OU event fails and will be retried later.
-        logger.error("Failed to get DAR address", addr=address)
-        raise error
+
+    logger.info("Found address in DAR", dar_uuid_address=dar_uuid_address)
+    return dar_uuid_address
 
 
 async def sd_postal_dar_address_strategy(
@@ -45,7 +46,11 @@ async def sd_postal_dar_address_strategy(
             logger.info("Processing postal address interval", interval=interval.dict())
 
             interval_value = cast(str, interval.value)  # To make mypy happy...
-            dar_uuid_address = await _get_dar_address(dar_client, interval_value)
+            # The SD postal address has the format "<street>, <postal code>, <town>",
+            # but DAR requires the format "<street>, <postal code> <town>", so we
+            # remove the last comma (the street may contain commas itself)
+            dar_search_address = " ".join(interval_value.rsplit(", ", 1))
+            dar_uuid_address = await _get_dar_address(dar_client, dar_search_address)
 
             if dar_uuid_address is None:
                 continue
