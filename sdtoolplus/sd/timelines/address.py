@@ -4,7 +4,6 @@ from typing import cast
 from uuid import UUID
 
 import structlog
-from async_lru import alru_cache
 from fastramqpi.os2mo_dar_client import AsyncDARClient
 
 from sdtoolplus.config import SDToolPlusSettings
@@ -15,7 +14,6 @@ from sdtoolplus.models import combine_intervals
 logger = structlog.stdlib.get_logger()
 
 
-@alru_cache()
 async def _get_dar_address(dar_client: AsyncDARClient, address: str) -> UUID | None:
     try:
         r = await dar_client.cleanse_single(address)
