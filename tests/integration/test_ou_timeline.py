@@ -2652,7 +2652,7 @@ async def test_ou_timeline_postal_dar_address(
     """
     We are testing this scenario:
 
-    DAR1: Silkeborgvej 260, 1.sal, 8230 Åbyhøj
+    DAR1: Silkeborgvej 260, 1., 8230 Åbyhøj
     DAR2: Silkeborgvej 2, 1., 8000 Aarhus C
     non-DAR1: Paradisæblevej 13, 1000 Andeby
     non-DAR2: Fasanvænget 14, 2000 Gåserød
@@ -2731,7 +2731,7 @@ async def test_ou_timeline_postal_dar_address(
             <DepartmentLevelIdentifier>NY0-niveau</DepartmentLevelIdentifier>
             <DepartmentName>name2</DepartmentName>
             <PostalAddress>
-              <StandardAddressIdentifier>Silkeborgvej 260, 1.sal</StandardAddressIdentifier>
+              <StandardAddressIdentifier>Silkeborgvej 260, 1.</StandardAddressIdentifier>
               <PostalCode>8230</PostalCode>
               <DistrictName>Åbyhøj</DistrictName>
               <MunicipalityCode>4000</MunicipalityCode>
@@ -2773,7 +2773,7 @@ async def test_ou_timeline_postal_dar_address(
             <DepartmentLevelIdentifier>NY0-niveau</DepartmentLevelIdentifier>
             <DepartmentName>name5</DepartmentName>
             <PostalAddress>
-              <StandardAddressIdentifier>Silkeborgvej 260, 1.sal</StandardAddressIdentifier>
+              <StandardAddressIdentifier>Silkeborgvej 260, 1.</StandardAddressIdentifier>
               <PostalCode>8230</PostalCode>
               <DistrictName>Åbyhøj</DistrictName>
               <MunicipalityCode>4000</MunicipalityCode>
