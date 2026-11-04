@@ -2862,6 +2862,141 @@ async def test_ou_timeline_postal_dar_address(
 @pytest.mark.integration_test
 @pytest.mark.envvar(
     {
+        "APPLY_NY_LOGIC": "false",
+        "MO_SUBTREE_PATHS_FOR_ROOT": '{"II": ["12121212-1212-1212-1212-121212121212", "10000000-0000-0000-0000-000000000000"]}',
+        "USE_DAR_ADDRESSES": "true",
+    }
+)
+async def test_ou_timeline_postal_dar_address_from_adressevaelger(
+    test_client: AsyncClient,
+    graphql_client: GraphQLClient,
+    org_unit_type: OrgUnitUUID,
+    org_unit_levels: dict[str, OrgUnitLevelUUID],
+    base_tree_builder: TestingCreateOrgUnitOrgUnitCreate,
+    respx_mock: MockRouter,
+) -> None:
+    """
+    SD is mocked, but the DAR address lookup calls the real Adressevælger API
+    (https://adressevaelger.dk).
+
+    Time  ---------------t1--------------------------------------------------------->
+
+    MO (postal)                               (empty)
+
+    SD (postal)          |----------------Silkeborgvej 260, 8230 Åbyhøj-------------
+
+    "Assert" intervals   |-------------------------------1--------------------------
+    """
+    # Arrange
+    tz = ZoneInfo("Europe/Copenhagen")
+    t1 = datetime(2001, 1, 1, tzinfo=tz)
+
+    unit_uuid = UUID("11111111-1111-1111-1111-111111111111")
+    dar_address_uuid = "5bc8d53a-ac6f-4d57-ad53-10063f38cc17"
+
+    visibility_class_uuid = await get_class(
+        gql_client=graphql_client,
+        facet_user_key="visibility",
+        class_user_key="Public",
+    )
+    postal_address_type_uuid = await get_class(
+        gql_client=graphql_client,
+        facet_user_key="org_unit_address_type",
+        class_user_key="AddressMailUnit",
+    )
+
+    sd_dep_resp = f"""<?xml version="1.0" encoding="UTF-8"?>
+        <GetDepartment20111201 creationDateTime="2025-02-18T10:41:08">
+          <RequestStructure>
+            <InstitutionIdentifier>II</InstitutionIdentifier>
+            <DepartmentUUIDIdentifier>{str(unit_uuid)}</DepartmentUUIDIdentifier>
+            <ActivationDate>1930-02-18</ActivationDate>
+            <DeactivationDate>9999-12-31</DeactivationDate>
+            <ContactInformationIndicator>false</ContactInformationIndicator>
+            <DepartmentNameIndicator>true</DepartmentNameIndicator>
+            <EmploymentDepartmentIndicator>false</EmploymentDepartmentIndicator>
+            <PostalAddressIndicator>true</PostalAddressIndicator>
+            <ProductionUnitIndicator>true</ProductionUnitIndicator>
+            <UUIDIndicator>true</UUIDIndicator>
+          </RequestStructure>
+          <RegionIdentifier>RI</RegionIdentifier>
+          <RegionUUIDIdentifier>838b8691-7785-4f64-a83a-b383567dd171</RegionUUIDIdentifier>
+          <InstitutionIdentifier>II</InstitutionIdentifier>
+          <InstitutionUUIDIdentifier>d6024493-a920-4040-9876-9faaae88efc1</InstitutionUUIDIdentifier>
+          <Department>
+            <ActivationDate>2001-01-01</ActivationDate>
+            <DeactivationDate>9999-12-31</DeactivationDate>
+            <DepartmentIdentifier>ABCD</DepartmentIdentifier>
+            <DepartmentUUIDIdentifier>{str(unit_uuid)}</DepartmentUUIDIdentifier>
+            <DepartmentLevelIdentifier>NY0-niveau</DepartmentLevelIdentifier>
+            <DepartmentName>name1</DepartmentName>
+            <PostalAddress>
+              <StandardAddressIdentifier>Silkeborgvej 260</StandardAddressIdentifier>
+              <PostalCode>8230</PostalCode>
+              <DistrictName>Åbyhøj</DistrictName>
+              <MunicipalityCode>751</MunicipalityCode>
+            </PostalAddress>
+          </Department>
+        </GetDepartment20111201>
+    """
+
+    respx_mock.get(
+        f"https://service.sd.dk/sdws/GetDepartment20111201?InstitutionIdentifier=II&DepartmentUUIDIdentifier={str(unit_uuid)}&ActivationDate=01.01.0001&DeactivationDate=31.12.9999&ContactInformationIndicator=True&DepartmentNameIndicator=True&PostalAddressIndicator=True&ProductionUnitIndicator=True&UUIDIndicator=True"
+    ).respond(
+        content_type="text/xml;charset=UTF-8",
+        content=sd_dep_resp,
+    )
+
+    respx_mock.get(
+        f"https://service.sd.dk/api-gateway/organization/public/api/v1/organizations/uuids/{str(unit_uuid)}/department-parent-history"
+    ).respond(
+        json=[
+            {
+                "startDate": "2001-01-01",
+                "endDate": "9999-12-31",
+                "parentUuid": "10000000-0000-0000-0000-000000000000",
+            }
+        ],
+    )
+
+    # Act
+    r = await test_client.post(
+        "/events/sd/org",
+        json={
+            "subject": json.dumps(
+                {"institution_identifier": "II", "org_unit": str(unit_uuid)}
+            ),
+            "priority": 9000,
+        },
+    )
+
+    # Assert
+    assert r.status_code == 200
+
+    postal_addresses = await graphql_client.get_address_timeline(
+        AddressFilter(
+            org_unit=OrganisationUnitFilter(uuids=[unit_uuid]),
+            address_type=ClassFilter(
+                facet=FacetFilter(user_keys=["org_unit_address_type"]),
+                user_keys=["AddressMailUnit"],
+            ),
+            from_date=None,
+            to_date=None,
+        )
+    )
+
+    validity = one(one(postal_addresses.objects).validities)
+    assert validity.validity.from_ == t1
+    assert mo_end_to_timeline_end(validity.validity.to) == POSITIVE_INFINITY
+    assert validity.user_key == dar_address_uuid
+    assert validity.value == dar_address_uuid
+    assert validity.visibility_uuid == visibility_class_uuid
+    assert validity.address_type.uuid == postal_address_type_uuid
+
+
+@pytest.mark.integration_test
+@pytest.mark.envvar(
+    {
         "MODE": "region",
         "UNKNOWN_UNIT": str(UNKNOWN_UNIT),
         "APPLY_NY_LOGIC": "false",
